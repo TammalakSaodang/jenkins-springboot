@@ -73,6 +73,7 @@ pipeline {
             }
         }
 
+        /*
         stage('Test & Package') {
             when { expression { params.ACTION == 'Build & Deploy' } }
             steps {
@@ -98,6 +99,40 @@ pipeline {
                         publishHTML(target: [
                             allowMissing: true, reportDir: 'target/site/jacoco', reportFiles: 'index.html',
                             reportName: 'JaCoCo Coverage', keepAll: true
+                        ])
+                    }
+                }
+            }
+        }
+        */
+
+        stage('Test & Package') {
+            when { expression { params.ACTION == 'Build & Deploy' } }
+            agent {
+                docker {
+                    image 'maven:3.9-eclipse-temurin-21'
+                    // cache Maven dependencies ไม่ต้อง download ใหม่ทุกครั้ง
+                    args '-v $HOME/.m2:/root/.m2'
+                    reuseNode true  // ใช้ workspace เดิม
+                }
+            }
+            steps {
+                dir(env.PROJECT_DIR) {
+                    echo "Running Maven Test & Package inside Docker..."
+                    sh 'mvn -B -ntp clean package'
+                }
+            }
+            post {
+                always {
+                    dir(env.PROJECT_DIR) {
+                        // allowEmptyResults ป้องกัน error ถ้าไม่มีไฟล์ test
+                        junit allowEmptyResults: true, testResults: 'target/surefire-reports/*.xml'
+                        publishHTML(target: [
+                            allowMissing         : true,
+                            reportDir            : 'target/site/jacoco',
+                            reportFiles          : 'index.html',
+                            reportName           : 'JaCoCo Coverage',
+                            keepAll              : true
                         ])
                     }
                 }
